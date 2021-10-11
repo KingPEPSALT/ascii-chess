@@ -3,7 +3,6 @@ Written by Pepsalt#1124
 
 Red is equivalent to Black, Blue to White
 */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,23 +15,17 @@ void clearscrn()
   HANDLE hStdOut;
   CONSOLE_SCREEN_BUFFER_INFO csbi;
   DWORD count, cellCount;
-
   hStdOut = GetStdHandle( STD_OUTPUT_HANDLE );
   if (hStdOut == INVALID_HANDLE_VALUE) return;
-
   if (!GetConsoleScreenBufferInfo( hStdOut, &csbi )) return;
   cellCount = csbi.dwSize.X *csbi.dwSize.Y;
-
   if (!FillConsoleOutputCharacter(hStdOut,(TCHAR) ' ',cellCount,(COORD){0,0},&count)) return;
-
   if (!FillConsoleOutputAttribute(hStdOut, csbi.wAttributes, cellCount,(COORD){0,0}, &count)) return;
   SetConsoleCursorPosition(hStdOut, (COORD){0,0});
 }
-
 #else // !_WIN32
 #include <unistd.h>
 #include <term.h>
-
 void clearscrn()
 {
   if (!cur_term)
@@ -45,23 +38,19 @@ void clearscrn()
    putp( tigetstr( "clear" ) );
 }
 #endif
-
 // ANSI colour
 #define COLOUR_RED     "\x1b[31m"
 #define COLOUR_BLUE    "\x1b[34m"
 #define COLOUR_RESET   "\x1b[0m"
-
 typedef struct piece_data{
     char character;
     int data;
 } piece;
-
 void output_board(piece * board_pieces){
     char board_under[8*10] = "1|# # # # 2| # # # #3|# # # # 4| # # # #5|# # # # 6| # # # #7|# # # # 8| # # # #";
     puts("0|12345678\n-+--------");
     for(int y = 0; y < 8; y++){
         for(int x = 0; x < 10; x++){
-            
             if(board_pieces[y*8+x-2].character==' ' || x<2){
                 putchar((int)board_under[y*10+x]);
             }else if(x>0){
@@ -70,7 +59,6 @@ void output_board(piece * board_pieces){
         }
         putchar('\n');
     }
-    
 }
     
 // 1 true, 0 false
@@ -85,7 +73,6 @@ int validate_row_movement(int x1, int y1, int x2, int y2, piece* pieces){
 }
 int validate_column_movement(int x1, int y1, int x2, int y2, piece* pieces){
     if(x1!=x2) return 0;
-    int i = 0;
     int cbegin = y1<y2?y1:y2, cend = y1<y2?y2:y1; // dynamic column start/end to account for backwards movement
     for(int yindex = cbegin+1; yindex < cend; yindex++){
         if(pieces[yindex*8+x1].character != ' ') {
@@ -113,11 +100,10 @@ int in_bounds(int xord, int yord){
     return (int)!(xord < 0 || yord < 0 || xord > 7 || yord > 7);
 }
 
-int get_special_piece(char type, int colour, piece* pieces){
+int get_king(int colour, piece* pieces){
     for(int i = 0; i < 8*8; i++)
-        if(pieces[i].data%2 == colour && pieces[i].character == type)
+        if(pieces[i].data%2 == colour && pieces[i].character == 'K')
             return i;
-    
 }
 // 1 for not in check, 0 for in check
 int place_in_check(int xord, int yord, piece* pieces, piece king){
@@ -140,7 +126,6 @@ void move(int x1, int y1, int x2, int y2, piece* pieces){
     if(current.character == 'P' && current.data <5) current.data += 2; // change pawn data to show it has moved 1+ times
     pieces[y2*8+x2] = current;
 }
-
 
 // ensures move lies within rules of the piece being moved
 int validate_movement_rules(int x1, int y1, int x2, int y2, piece* pieces){
@@ -178,20 +163,18 @@ int validate_movement_rules(int x1, int y1, int x2, int y2, piece* pieces){
         }
         if(x2-x1<0 && curcolour) return 0; //black backwards check
         if(x2-x1>0 && !curcolour) return 0; //white backwards check
-    
+        break;
     // knight
     case 'N':;
         if(x1==x2 || y1==y2) return 0; // cannot move sideways or upwards only
         if(!(abs(x2-x1)==1&&abs(y2-y1)==2 || abs(x2-x1)==2&&abs(y2-y1)==1)) return 0; // not L shaped movement
-    
+        break;
     // king
     case 'K':;
         if(abs(x1-x2)>1 || abs(y1-y2)>1) return 0; // cant move more than 1 distance away
         return place_in_check(x2,y2, pieces, pieces[y1*8+x1]); // pretend the king to be in location, check if location in check
-    
     }
     return 1;
-
 }
 
 // validates the logic behind a move and considers whole board
@@ -199,32 +182,29 @@ int validate_movement(int x1, int y1, int x2, int y2, piece* pieces){
     if(!in_bounds(x1, y1) || !in_bounds(x2, y2)) return 0; // bounds check
     piece current = pieces[y1*8+x1];
     piece destination = pieces[y2*8+x2];
-
     // 1 for black, 0 for white
     int curcolour = current.data%2; 
     int destcolour = destination.data%2;
-    
     // create board that would hold the potentially invalid movement
     piece* supposed_movement = (piece*)malloc(sizeof(piece)*8*8);
     memcpy(supposed_movement, pieces, sizeof(piece)*8*8);
 
     move(x1, y1, x2, y2, supposed_movement); // force movement 
-    int king = get_special_piece('K', curcolour, supposed_movement); // get index of king
+    int king = get_king(curcolour, supposed_movement); // get index of king
     if(place_in_check(king%8, (king-king%8)/8, supposed_movement, supposed_movement[king])) return 0; // check if this move will put same colour's king in check
     // memory is freed after fn, no need for free()
-    
     return validate_movement_rules(x1, y1, x2, y2, pieces); // move is valid
 }
+
 int pinning_piece(int xord, int yord, piece* pieces){
     int colour = pieces[yord*8+xord].data%2;
     piece* supposed_movement = (piece*)malloc(sizeof(piece)*8*8);
     memcpy(supposed_movement, pieces, sizeof(piece)*8*8);
     supposed_movement[yord*8+xord].data = 0;
     supposed_movement[yord*8+xord].character = ' ';
-    int king = get_special_piece('K', colour, supposed_movement); // get index of king
-    int x = place_in_check(king%8, (king-king%8)/8, supposed_movement, supposed_movement[king]);
+
+    int king = get_king(colour, supposed_movement); // get index of king
     return place_in_check(king%8, (king-king%8)/8, supposed_movement, supposed_movement[king]); //check if in check after piece removed;
-    
 }
 // excludes king from calculation
 int legal_move(int xord, int yord, piece* pieces){
@@ -244,7 +224,6 @@ int legal_move(int xord, int yord, piece* pieces){
             return (in_bounds(xord-1, forwardY)&&(pinnedBy==yord*8+xord-1)) || (in_bounds(xord+1, forwardY)&&(pinnedBy==yord*8+xord-1));
         return 1;
     case 'N':;
-        
         possible_movements[0] = xord+2, possible_movements[1] = yord+1;
         possible_movements[2] = xord+2, possible_movements[3] = yord-1;
         possible_movements[4] = xord-2, possible_movements[5] = yord+1;
@@ -253,7 +232,6 @@ int legal_move(int xord, int yord, piece* pieces){
         possible_movements[10]= xord+1, possible_movements[11]= yord+2;
         possible_movements[12]= xord-1, possible_movements[13]= yord-2;
         possible_movements[14]= xord+1, possible_movements[15]= yord-1;
-        
         if(pinnedBy)
             return 0;
         for(int i = 0; i < 16; i+=2){
@@ -281,15 +259,16 @@ int legal_move(int xord, int yord, piece* pieces){
         }
         return 0;
     case 'Q':;
-        int possible_movements[] = {xord-1, yord-1, xord, yord-1, xord+1, yord-1, xord-1, yord, xord+1, yord, xord-1, yord+1, xord, yord+1, xord+1, yord+1};
-        possible_movements[0] = xord-1, possible_movements[1] = yord+1;
-        possible_movements[2] = xord+1, possible_movements[3] = yord+1;
-        possible_movements[4] = xord  , possible_movements[5] = yord+1;
-        possible_movements[6] = xord-1, possible_movements[7] = yord-1;
-        possible_movements[8] = xord+1, possible_movements[8] = yord-1;
-        possible_movements[10]= xord  , possible_movements[11]= yord-1;
-        possible_movements[12]= xord-1, possible_movements[13]= yord  ;
-        possible_movements[14]= xord+1, possible_movements[15]= yord  ;
+        
+        possible_movements[0] = xord-1, possible_movements[1] = yord-1;
+        possible_movements[2] = xord, possible_movements[3] = yord-1;
+        possible_movements[4] = xord+1, possible_movements[5] = yord-1;
+        possible_movements[6] = xord-1, possible_movements[7] = yord;
+        possible_movements[8] = xord+1, possible_movements[9] = yord;
+        possible_movements[10] = xord-1, possible_movements[11] = yord+1;
+        possible_movements[12] = xord, possible_movements[13] = yord+1;
+        possible_movements[14] = xord+1, possible_movements[15] = yord+1;
+
         for(int i = 0; i < 16; i+=2){
             cur_x = possible_movements[i], cur_y = possible_movements[i+1];
             if(in_bounds(cur_x, cur_y))
@@ -325,7 +304,6 @@ int stalemate(int xord, int yord, piece* pieces){
         for(int x = 0; x < 8; x++)
             if(pieces[y*8+x].data%2==pieces[yord*8+xord].data%2)
                 if(legal_move(x, y, pieces)){
-                    printf("%d %d", x,y);
                     return 0;
                 }
     int cur_x,cur_y;
@@ -335,7 +313,6 @@ int stalemate(int xord, int yord, piece* pieces){
             if(!place_in_check(cur_x, cur_y, pieces, pieces[yord*8+xord]))
                 if(!(pieces[cur_y*8+cur_x].data%2==pieces[yord*8+xord].data%2&&pieces[cur_y*8+cur_x].character!=' '))
                     return 0;
-                
     }
     return 1;
 }
@@ -352,7 +329,7 @@ int turn(int colour, piece* pieces){
     int king, x1, y1, x2, y2;
     begin:
         clearscrn();
-        king = get_special_piece('K', !colour, pieces);
+        king = get_king(!colour, pieces);
         output_board(pieces);
         printf("%s%s PICK A PIECE\nX>", text_colour, COLOUR_RESET);
         scanf("%d", &x1);
@@ -397,7 +374,6 @@ int main(){
          {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4},
          {'R', 2}, {'N', 2}, {'B', 2}, {'Q', 2}, {'K', 2}, {'B', 2}, {'N', 2}, {'R', 2}
     };
-
     while(1){
         if(turn(0, pieces)) return 0;
         if(turn(1, pieces)) return 0;
