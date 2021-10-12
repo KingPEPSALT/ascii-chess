@@ -25,17 +25,9 @@ void clearscrn()
 }
 #else // !_WIN32
 #include <unistd.h>
-#include <term.h>
 void clearscrn()
 {
-  if (!cur_term)
-  {
-     int result;
-     setupterm( NULL, STDOUT_FILENO, &result );
-     if (result <= 0) return;
-  }
-
-   putp( tigetstr( "clear" ) );
+    printf("\033[H\033[J");
 }
 #endif
 // ANSI colour
@@ -156,6 +148,7 @@ int validate_movement_rules(int x1, int y1, int x2, int y2, piece* pieces){
         if(x1 != x2){ // pawn take
             if(destcolour == curcolour || destination.character==' ') return 0; // can't take own piece or take empty space
             if(abs(y2-y1)>1 || abs(x2-x1)>1) return 0; // check it is a 1 diagonal move (un percent added in future)
+						return 1;
         }
         if(abs(y2-y1)>1){ // moves more than 1 forward
             if(current.data<5 && abs(y2-y1)==2 && pieces[((y1<y2?y1:y2)+1)*8+x1].character==' ') return 1; // 1st move allow it
@@ -374,7 +367,22 @@ int main(){
          {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4},
          {'R', 2}, {'N', 2}, {'B', 2}, {'Q', 2}, {'K', 2}, {'B', 2}, {'N', 2}, {'R', 2}
     };
-    while(1){
+		/*
+		stalemate/checkmate with pawn-forward test
+		piece pieces[8*8] = {
+         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {'R', 2}, {' ', 0},
+         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
+         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
+         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
+         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {'B', 2}, {' ', 0},
+         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
+         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {'P', 5},
+         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {'K', 1},
+    };
+		7,5 to 6,6 causes BLUE checkmate
+		7,5 to any other available square causes stalemate
+		*/
+    while(1){ 
         if(turn(0, pieces)) return 0;
         if(turn(1, pieces)) return 0;
     }
