@@ -7,6 +7,7 @@ Red is equivalent to Black, Blue to White
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <ctype.h>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -39,8 +40,8 @@ typedef struct piece_data{
     int data;
 } piece;
 void output_board(piece * board_pieces){
-    char board_under[8*10] = "1|# # # # 2| # # # #3|# # # # 4| # # # #5|# # # # 6| # # # #7|# # # # 8| # # # #";
-    puts("0|12345678\n-+--------");
+    char board_under[8*10] = "8|# # # # 7| # # # #6|# # # # 5| # # # #4|# # # # 3| # # # #2|# # # # 1| # # # #";
+    puts("+|12345678\n-+--------");
     for(int y = 0; y < 8; y++){
         for(int x = 0; x < 10; x++){
             if(board_pieces[y*8+x-2].character==' ' || x<2){
@@ -150,6 +151,7 @@ int validate_movement_rules(int x1, int y1, int x2, int y2, piece* pieces){
             if(abs(y2-y1)>1 || abs(x2-x1)>1) return 0; // check it is a 1 diagonal move (un percent added in future)
 						return 1;
         }
+        if(destcolour!=curcolour&&destination.character!=' ') return 0;
         if(abs(y2-y1)>1){ // moves more than 1 forward
             if(current.data<5 && abs(y2-y1)==2 && pieces[((y1<y2?y1:y2)+1)*8+x1].character==' ') return 1; // 1st move allow it
             return 0; // invalid move!
@@ -310,6 +312,25 @@ int stalemate(int xord, int yord, piece* pieces){
     return 1;
 }
 
+int create_board(const char* fen, piece* pieces){
+    int cur_idx = 0, colour = 0, empties = 0, i = 0;
+    char curchar;
+    for(; i < strlen(fen); i++){
+        curchar = fen[i], colour = tolower((int)    curchar)==curchar?1:0;
+        if(curchar == '/') continue;
+        if(curchar == ' ') break;
+        if(isdigit(curchar)){
+            empties = (int)(curchar - '0');
+            for(int j = 0; j < empties; j++) pieces[cur_idx + j].character = ' ', pieces[cur_idx+j].data = 0;
+            cur_idx += empties;
+        }else{
+            pieces[cur_idx].character = toupper((int)curchar);
+            pieces[cur_idx].data = (curchar == 'p' || curchar == 'P') ? (cur_idx/8==(colour?6:1) ? colour+4 : colour+2) : colour;
+            ++cur_idx;
+        }
+    }
+    return fen[i+1]=='b';
+}
 int checkmate(int xord, int yord, piece* pieces){
     return place_in_check(xord, yord, pieces, pieces[yord*8+xord]) && stalemate(xord, yord, pieces);
 }
@@ -328,19 +349,18 @@ int turn(int colour, piece* pieces){
         scanf("%d", &x1);
         printf("Y>");
         scanf("%d", &y1);
-        x1 -= 1, y1 -= 1;
-
-        if(pieces[y1*8+x1].data%2&&!colour) goto begin;
+        x1 -= 1, y1 = 8 - y1;
+        if(pieces[y1*8+x1].data%2!=colour) goto begin;
 
         clearscrn();
         output_board(pieces);
-        printf("%s%s WITH (%d, %d) MOVE\nX>",text_colour, COLOUR_RESET, x1+1, y1+1);
+        printf("%s%s WITH (%d, %d) MOVE\nX>",text_colour, COLOUR_RESET, x1+1, 8-y1);
         scanf("%d", &x2);
         printf("Y>");
         scanf("%d", &y2);
-        x2 -= 1, y2 -= 1;
-
+        x2 -= 1, y2 = 8-y2;
         if(validate_movement(x1, y1, x2, y2, pieces)) move(x1, y1, x2, y2, pieces);
+        
         else goto begin;
 
         clearscrn();
@@ -355,36 +375,28 @@ int turn(int colour, piece* pieces){
         };
     return 0;
 }
-int main(){
+int main(int argc, char *argv[]){
     clearscrn();
-    piece pieces[8*8] = {
-         {'R', 1}, {'N', 1}, {'B', 1}, {'K', 1}, {'Q', 1}, {'B', 1}, {'N', 1}, {'R', 1},
-         {'P', 3}, {'P', 3}, {'P', 3}, {'P', 3}, {'P', 3}, {'P', 3}, {'P', 3}, {'P', 3},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
-         {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4}, {'P', 4},
-         {'R', 2}, {'N', 2}, {'B', 2}, {'Q', 2}, {'K', 2}, {'B', 2}, {'N', 2}, {'R', 2}
-    };
-		/*
-		stalemate/checkmate with pawn-forward test
-		piece pieces[8*8] = {
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {'R', 2}, {' ', 0},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {'B', 2}, {' ', 0},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {'P', 5},
-         {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {' ', 0}, {'K', 1},
-    };
-		7,5 to 6,6 causes BLUE checkmate
-		7,5 to any other available square causes stalemate
-		*/
-    while(1){ 
-        if(turn(0, pieces)) return 0;
-        if(turn(1, pieces)) return 0;
+    /*
+    test FENs:
+
+    */
+    piece pieces[8*8];
+    char* fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w";
+    // handle args
+    if(argc>1){
+        int found_argument_functionality = 0;
+        for(int n = 1; n < argc; n+=2){
+            char * current_argument = argv[n], * current_argument_input = argv[n+1];
+            if(!strcmp(current_argument, "--board")) fen = current_argument_input;
+            //else if(!strcmp(current_argument, "-o")) logging_file=fopen(current_argument_input, "w");
+        }
+    }
+    int start = create_board(fen, pieces);
+    int current_halfmove = 0;
+    while(1){
+        if(turn(start, pieces)) break;
+        if(turn(!start, pieces))break;
     }
     return 0;
 }
